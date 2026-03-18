@@ -138,6 +138,7 @@ func (h *MemoryHandler) Summary(c *gin.Context) {
 func writeServiceError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, service.ErrInvalidUserID),
+		errors.Is(err, service.ErrUserIDTooLong),
 		errors.Is(err, service.ErrInvalidContent),
 		errors.Is(err, service.ErrInvalidCategory),
 		errors.Is(err, service.ErrInvalidSource),
