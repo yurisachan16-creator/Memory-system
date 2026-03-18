@@ -1,0 +1,67 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: memory-system-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: memory_password
+      MYSQL_DATABASE: memory_system
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -pmemory_password --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    container_name: memory-system-redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: memory-system-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_ENV: docker
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+      AUTO_MIGRATE: "true"
+      MYSQL_DRIVER: mysql
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: root
+      MYSQL_PASSWORD: memory_password
+      MYSQL_DATABASE: memory_system
+      MYSQL_PARAMS: charset=utf8mb4&parseTime=true&loc=Local&multiStatements=true
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: memory-system-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "4173:80"
