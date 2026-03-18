@@ -54,3 +54,14 @@ services:
       REDIS_DB: 0
     ports:
       - "8080:8080"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: memory-system-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "4173:80"
