@@ -29,6 +29,14 @@ func NewHealthHandler(deps Dependencies) *HealthHandler {
 	}
 }
 
+// Health godoc
+// @Summary Check backend health
+// @Description Check service, database and Redis connectivity.
+// @Tags health
+// @Produce json
+// @Success 200 {object} healthResponse
+// @Failure 503 {object} errorResponse
+// @Router /healthz [get]
 func (h *HealthHandler) Health(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 3*time.Second)
 	defer cancel()
@@ -64,4 +72,3 @@ func (h *HealthHandler) Ping(c *gin.Context) {
 		"service": "memory-system-backend",
 	})
 }
-
