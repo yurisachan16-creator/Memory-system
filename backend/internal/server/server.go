@@ -46,7 +46,13 @@ func New(cfg appconfig.Config) (*App, error) {
 	}
 
 	engine := gin.New()
-	engine.Use(middleware.CORS(), middleware.Logger(), middleware.Recovery())
+	engine.Use(
+		middleware.RequestID(),
+		middleware.RateLimit(),
+		middleware.Logger(),
+		middleware.Recovery(),
+		middleware.CORS(),
+	)
 	handler.RegisterRoutes(engine, handler.Dependencies{
 		DB:    db,
 		Redis: redisClient,
@@ -73,4 +79,3 @@ func (a *App) Close() {
 		_ = a.db.Close()
 	}
 }
-

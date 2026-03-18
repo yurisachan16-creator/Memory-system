@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -272,5 +273,35 @@ func TestListMemoriesCachesAndInvalidatesOnWrite(t *testing.T) {
 	}
 	if third.Items[0].Content != "First memory updated" {
 		t.Fatalf("expected updated content after invalidation, got %q", third.Items[0].Content)
+	}
+}
+
+func TestCreateMemoryRejectsTooLongUserID(t *testing.T) {
+	svc := newTestService(time.Date(2026, 3, 19, 0, 0, 0, 0, time.UTC))
+
+	_, _, err := svc.CreateMemory(context.Background(), model.CreateMemoryRequest{
+		UserID:     strings.Repeat("u", 65),
+		Content:    "valid content",
+		Category:   model.CategoryPreference,
+		Source:     model.SourceManual,
+		Importance: 3,
+	})
+	if err != ErrUserIDTooLong {
+		t.Fatalf("expected ErrUserIDTooLong, got %v", err)
+	}
+}
+
+func TestListMemoriesRejectsTooLongUserID(t *testing.T) {
+	svc := newTestService(time.Date(2026, 3, 19, 0, 0, 0, 0, time.UTC))
+
+	_, err := svc.ListMemories(context.Background(), model.ListMemoriesQuery{
+		UserID:   strings.Repeat("u", 65),
+		SortBy:   "created_at",
+		Order:    "desc",
+		Page:     1,
+		PageSize: 10,
+	})
+	if err != ErrUserIDTooLong {
+		t.Fatalf("expected ErrUserIDTooLong, got %v", err)
 	}
 }

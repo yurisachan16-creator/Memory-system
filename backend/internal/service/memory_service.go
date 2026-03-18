@@ -16,12 +16,14 @@ import (
 )
 
 const (
-	dedupLockRetryDelay = 25 * time.Millisecond
+	dedupLockRetryDelay  = 25 * time.Millisecond
 	dedupLockMaxAttempts = 20
+	maxUserIDLength      = 64
 )
 
 var (
 	ErrInvalidUserID     = errors.New("user_id is required")
+	ErrUserIDTooLong     = errors.New("user_id must be at most 64 characters")
 	ErrInvalidContent    = errors.New("content must not be empty")
 	ErrInvalidCategory   = errors.New("category is invalid")
 	ErrInvalidSource     = errors.New("source is invalid")
@@ -325,8 +327,12 @@ func (s *MemoryService) acquireDedupLock(ctx context.Context, key string) error 
 }
 
 func validateCreateRequest(req model.CreateMemoryRequest) error {
-	if strings.TrimSpace(req.UserID) == "" {
+	userID := strings.TrimSpace(req.UserID)
+	if userID == "" {
 		return ErrInvalidUserID
+	}
+	if len(userID) > maxUserIDLength {
+		return ErrUserIDTooLong
 	}
 	if model.NormalizeContent(req.Content) == "" {
 		return ErrInvalidContent
@@ -360,8 +366,12 @@ func validateUpdateRequest(req model.UpdateMemoryRequest) error {
 }
 
 func validateListQuery(query model.ListMemoriesQuery) error {
-	if strings.TrimSpace(query.UserID) == "" {
+	userID := strings.TrimSpace(query.UserID)
+	if userID == "" {
 		return ErrInvalidUserID
+	}
+	if len(userID) > maxUserIDLength {
+		return ErrUserIDTooLong
 	}
 	if query.Category != "" && !query.Category.Valid() {
 		return ErrInvalidCategory

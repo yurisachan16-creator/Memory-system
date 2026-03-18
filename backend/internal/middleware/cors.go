@@ -20,6 +20,7 @@ func CORS() gin.HandlerFunc {
 		AllowHeaders: []string{
 			"Content-Type",
 			"Authorization",
+			"X-Request-Id",
 		},
 		MaxAge: 12 * time.Hour,
 	})
