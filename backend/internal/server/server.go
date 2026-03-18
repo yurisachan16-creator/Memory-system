@@ -46,7 +46,7 @@ func New(cfg appconfig.Config) (*App, error) {
 	}
 
 	engine := gin.New()
-	engine.Use(middleware.Logger(), middleware.Recovery())
+	engine.Use(middleware.CORS(), middleware.Logger(), middleware.Recovery())
 	handler.RegisterRoutes(engine, handler.Dependencies{
 		DB:    db,
 		Redis: redisClient,
