@@ -1,182 +1,292 @@
 # Memory System
 
-基于 Go + Gin + MySQL + Redis 的简易记忆系统，实现了记忆 CRUD、搜索、摘要、缓存和测试骨架。
+> **Language / 语言：** English | [中文](README.zh-CN.md)
 
-## 功能概览
+A full-stack AI memory management system built with **Go + Gin + MySQL + Redis** on the backend and **React + TypeScript + Ant Design** on the frontend. Supports memory CRUD, full-text search with multi-factor scoring, category-based summaries, Redis caching, and a bilingual (EN/ZH) UI.
 
-- `POST /api/v1/memories`：新增记忆，按 `user_id + content_hash` 去重，重复内容执行合并。
-- `GET /api/v1/memories`：分页查询，支持按 `category` 筛选、按 `created_at` 或 `importance` 排序。
-- `PUT /api/v1/memories/:id`：更新内容、分类和重要度，并校验归属。
-- `DELETE /api/v1/memories/:id`：软删除。
-- `GET /api/v1/memories/search`：全文检索 + LIKE 兜底召回，返回 Top 3-5。
-- `GET /api/v1/memories/summary`：聚合偏好、目标、背景和最近记忆。
+---
 
-## 项目结构
+## Quick Start
+
+The fastest way to run the entire stack (backend + frontend + MySQL + Redis) is Docker Compose:
+
+```bash
+git clone https://github.com/yurisachan16-creator/Memory-system.git
+cd Memory-system
+docker compose up --build
+```
+
+### Access Points
+
+| Service | URL | Description |
+|---------|-----|-------------|
+| **Frontend UI** | http://localhost:4173 | React dashboard — main entry point |
+| **Backend API** | http://localhost:8080/api/v1 | REST API base URL |
+| **Swagger Docs** | http://localhost:8080/swagger/index.html | Interactive API documentation |
+
+> **Tip:** Open the Frontend UI first. Use the top bar to set an active `user_id`, then navigate between **Memories**, **Search**, and **Summary** pages. Click the `中文` button (top-right) to switch to Chinese.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend language | Go 1.22 |
+| Web framework | Gin |
+| Database | MySQL 8.4 |
+| Cache | Redis 7 |
+| Frontend | React 18 + TypeScript + Vite |
+| UI library | Ant Design 5 |
+| Containerization | Docker + Docker Compose |
+| API docs | Swagger / swaggo |
+
+---
+
+## Project Structure
 
 ```text
 Memory-system/
 ├── backend/
-│   ├── cmd/server
-│   ├── config
-│   ├── http
-│   ├── internal
-│   │   ├── config
-│   │   ├── handler
-│   │   ├── middleware
-│   │   ├── model
-│   │   ├── repository
-│   │   ├── response
-│   │   ├── server
-│   │   └── service
-│   └── migrations
+│   ├── cmd/server/          # Entrypoint (main.go)
+│   ├── config/              # config.yaml
+│   ├── docs/                # Swagger generated files
+│   ├── http/                # Example .http request files
+│   ├── internal/
+│   │   ├── config/          # Config loading (viper)
+│   │   ├── handler/         # Gin route handlers
+│   │   ├── middleware/       # CORS, RequestID, RateLimit, Recovery
+│   │   ├── model/           # Structs and enums
+│   │   ├── repository/      # MySQL + Redis data access
+│   │   ├── response/        # Unified response wrapper
+│   │   ├── server/          # Gin engine setup and route registration
+│   │   └── service/         # Business logic
+│   ├── migrations/          # SQL migration files (golang-migrate)
+│   ├── Dockerfile
+│   ├── go.mod
+│   └── go.sum
+├── frontend/
+│   ├── docs/                # Frontend design documents (i18n, etc.)
+│   ├── src/
+│   │   ├── api/             # Axios client + API wrappers
+│   │   ├── components/      # AppShell, MemoryFormModal, etc.
+│   │   ├── context/         # UserContext, LanguageContext
+│   │   ├── i18n/            # Translation dictionaries (en-US, zh-CN)
+│   │   ├── pages/           # MemoryPage, SearchPage, SummaryPage
+│   │   └── types/           # TypeScript interfaces
+│   ├── Dockerfile
+│   ├── package.json
+│   └── vitest.config.ts
 ├── docker-compose.yml
-└── README.md
+├── README.md                # This file (English)
+└── README.zh-CN.md          # Chinese version
 ```
 
-## 表结构设计
+---
 
-迁移文件位于 `backend/migrations/000001_create_memories_table.up.sql`，核心字段如下：
+## API Endpoints
 
-| 字段 | 说明 |
-| --- | --- |
-| `id` | 自增主键 |
-| `user_id` | 用户标识 |
-| `content` | 记忆正文 |
-| `category` | `preference` / `identity` / `goal` / `context` |
-| `source` | `chat` / `manual` / `system` |
-| `importance` | 1-5，数值越高越重要 |
-| `content_hash` | 归一化后内容的 SHA256，用于去重 |
-| `is_deleted` | 软删除标记 |
-| `created_at` / `updated_at` | 创建和更新时间 |
+All endpoints use the `/api/v1` prefix.
 
-索引设计：
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/memories` | Create a memory (with deduplication) |
+| `GET` | `/memories` | List memories (filter, sort, paginate) |
+| `PUT` | `/memories/:id` | Update a memory (owner only) |
+| `DELETE` | `/memories/:id` | Soft-delete a memory (owner only) |
+| `GET` | `/memories/search` | Full-text search, returns top 3–5 results |
+| `GET` | `/memories/summary` | Aggregate summary by category |
 
-- `idx_user_category`：列表筛选。
-- `idx_user_importance`：按重要度排序。
-- `idx_user_created`：按时间排序。
-- `idx_content_hash`：重复内容查重。
-- `ft_content`：MySQL FULLTEXT 搜索召回。
+Full interactive documentation is available at **http://localhost:8080/swagger/index.html** when the service is running.
 
-## 核心设计
+---
 
-### 去重与合并策略
+## Data Model
 
-- 写入前先做 `NormalizeContent`，压缩空白并去掉首尾空格。
-- 再对归一化后的内容做小写 SHA256，形成 `content_hash`。
-- 在同一 `user_id` 下若找到相同 `content_hash`：
-  - 不新增记录。
-  - 合并为已有记录。
-  - `importance` 取更高值。
-  - `updated_at` 刷新为当前时间。
-- 更新接口如果把内容改成了另一条已有记忆的 hash，会返回冲突，避免两条记录在更新阶段合并成脏状态。
+The `memories` table schema (see `backend/migrations/`):
 
-### 删除策略
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | BIGINT | Auto-increment primary key |
+| `user_id` | VARCHAR(64) | User identifier |
+| `content` | TEXT | Memory body |
+| `category` | ENUM | `preference` / `identity` / `goal` / `context` |
+| `source` | ENUM | `chat` / `manual` / `system` |
+| `importance` | TINYINT | 1–5 (higher = more important) |
+| `content_hash` | VARCHAR(64) | SHA-256 of normalised content — used for deduplication |
+| `is_deleted` | TINYINT | Soft-delete flag |
+| `created_at` | DATETIME | Creation timestamp |
+| `updated_at` | DATETIME | Last update timestamp |
 
-- 删除采用软删除：`is_deleted = 1`。
-- 列表、搜索、摘要、去重查找都只处理 `is_deleted = 0` 的记录。
-- 这样既保留审计能力，也避免误删后无法恢复。
+**Indexes:** `idx_user_category`, `idx_user_importance`, `idx_user_created`, `idx_content_hash`, `ft_content` (FULLTEXT)
 
-### 检索策略
+---
 
-搜索流程分两层：
+## Core Design
 
-1. MySQL `MATCH(content) AGAINST(...)` 作为主召回。
-2. `LIKE %query%` 作为兜底补召回。
+### Deduplication Strategy
 
-排序采用多因素打分：
+Before inserting, content is normalised (whitespace collapsed, trimmed) and hashed with SHA-256 to produce `content_hash`. If a record with the same `user_id + content_hash` already exists:
 
-```text
-final_score = relevance_score * 0.5 + importance_score * 0.3 + recency_score * 0.2
+- No new row is inserted.
+- The existing record is **merged**: `importance` is updated to the higher value, `updated_at` is refreshed.
+- The update endpoint rejects changes that would produce a hash collision with another existing memory.
+
+**Why merge instead of reject?** Merging preserves information (higher importance) while keeping the database clean — a silent reject would confuse callers, and a hard error on duplicate data is unnecessarily strict for a memory system.
+
+### Delete Strategy
+
+All deletes are **soft deletes** (`is_deleted = 1`). List, search, summary, and deduplication queries filter to `is_deleted = 0`.
+
+**Why soft delete?** Preserves audit history and allows recovery from accidental deletes without external backup infrastructure.
+
+### Search Strategy
+
+Search runs a two-layer retrieval pipeline:
+
+1. **Primary recall** — `MATCH(content) AGAINST(query IN BOOLEAN MODE)` via MySQL FULLTEXT index.
+2. **Fallback recall** — `LIKE %query%` to catch short terms and partial matches that FULLTEXT misses.
+
+Results are de-duplicated and ranked by a multi-factor score:
+
+```
+final_score = relevance_score × 0.5 + importance_score × 0.3 + recency_score × 0.2
 ```
 
-- `relevance_score`：关键词命中比例，整句命中会获得更高分。
-- `importance_score`：`importance / 5`。
-- `recency_score`：按 30 天窗口线性衰减。
+- `relevance_score` — keyword hit ratio; full-sentence matches score higher.
+- `importance_score` — `importance / 5`.
+- `recency_score` — linear decay over a 30-day window.
 
-最终按 `final_score DESC` 排序，取 Top 3-5 条结果。
+Top 3–5 results by `final_score DESC` are returned.
 
-### Redis 使用方式
+### Redis Caching
 
-缓存层统一封装在 `backend/internal/repository`：
+| Key Pattern | Purpose | TTL |
+|-------------|---------|-----|
+| `memories:list:{user_id}:{hash(params)}` | List query cache | 5 min |
+| `memories:search:{user_id}:{query_hash}` | Search result cache | 5 min |
+| `memories:summary:{user_id}` | Summary cache | 10 min |
+| `memories:dedup:{user_id}:{content_hash}` | Concurrent write dedup lock (SETNX) | 10 s |
 
-| Key | 说明 | TTL |
-| --- | --- | --- |
-| `memories:list:{user_id}:{hash(query_params)}` | 记忆列表缓存 | 5 分钟 |
-| `memories:search:{user_id}:{query_hash}` | 搜索结果缓存 | 5 分钟 |
-| `memories:summary:{user_id}` | 摘要缓存 | 10 分钟 |
-| `memories:dedup:{user_id}:{content_hash}` | 写入去重锁 | 10 秒 |
+Cache entries for a user are invalidated atomically on any write (create / update / delete). When a cached result is served, the API sets `"cached": true` in the response.
 
-失效策略：
+---
 
-- `CreateMemory` / `UpdateMemory` / `DeleteMemory` 成功后，统一清理该用户的列表缓存、搜索缓存和摘要缓存。
-- 搜索和摘要命中缓存时，接口返回 `cached=true`。
-- 去重锁通过 Redis `SETNX` 实现，避免并发请求把同一条内容重复写入。
+## Frontend Features
 
-## 启动方式
+The React frontend connects to the backend API via Nginx reverse proxy (Docker) or Vite dev-server proxy (local).
 
-### 1. 使用 Docker Compose
+| Feature | Description |
+|---------|-------------|
+| **Global user switcher** | Top-bar input — sets `user_id` for all pages; recent users remembered |
+| **Memory Management** | Table view with category filter, sort, pagination, create/edit/delete |
+| **Search** | Full-text query with relevance, recency, and final-score display; matched terms highlighted |
+| **Summary Dashboard** | Four category buckets — Preferences, Goals, Background, Recent |
+| **Bilingual UI** | Click `中文` / `English` in the header to toggle; preference persisted to `localStorage` |
+
+---
+
+## Development Guide
+
+### Run backend locally
 
 ```bash
-docker compose up --build
-```
-
-默认端口：
-
-- 后端：`http://localhost:8080`
-- MySQL：容器内 `3306`
-- Redis：容器内 `6379`
-
-### 2. 本地运行后端
-
-先确保本机 MySQL 和 Redis 已启动，然后进入 `backend/`：
-
-```bash
+# Ensure MySQL and Redis are running locally, then:
+cd backend
 go run ./cmd/server
 ```
 
-配置来源：
+Configuration sources (in priority order):
+1. Environment variables: `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_DATABASE`, `REDIS_HOST`, `REDIS_PORT`, `SERVER_PORT`
+2. `backend/config/config.yaml`
 
-- `backend/config/config.yaml`
-- 环境变量覆盖，例如 `MYSQL_HOST`、`MYSQL_PORT`、`REDIS_HOST`、`SERVER_PORT`
-
-## 测试
+### Run frontend locally (dev mode)
 
 ```bash
+cd frontend
+npm install
+npm run dev
+# → http://localhost:5173 (Vite dev server with API proxy to :8080)
+```
+
+---
+
+## Testing
+
+### Backend
+
+```bash
+cd backend
 go test ./...
 ```
 
-当前测试覆盖：
+Coverage areas:
+- **Repository layer** — `sqlmock` covering list, search, and soft-delete ownership checks.
+- **Service layer** — deduplication merge, search/summary/list cache invalidation.
+- **Handler layer** — `httptest` covering all 6 API endpoints end-to-end.
 
-- repository：`sqlmock` 覆盖 MySQL 列表、搜索和软删除归属校验。
-- service：去重合并、搜索缓存、摘要缓存、列表缓存失效。
-- handler：`httptest` 覆盖 CRUD、搜索、摘要接口流程。
+Example request file: `backend/http/memories.http`
 
-示例请求文件：
-
-- `backend/http/memories.http`
-
-## 示例请求
+### Frontend
 
 ```bash
+cd frontend
+npm install
+npm run test:run      # single run
+npm test              # watch mode
+npm run test:coverage # coverage report
+```
+
+Test suites:
+- `i18n.test.ts` — `translate()` function, key completeness, param interpolation.
+- `LanguageContext.test.tsx` — provider defaults, toggle, localStorage persistence, param interpolation.
+- `AppShell.test.tsx` — toggle button label, full UI language switch, nav items.
+
+---
+
+## Middleware
+
+| Middleware | Description |
+|-----------|-------------|
+| CORS | Allows cross-origin requests from the frontend dev server |
+| RequestID | Generates a UUID per request; returned in `X-Request-Id` response header |
+| RateLimit | 30 req/s per IP via token bucket; returns 429 on excess |
+| Recovery | Catches panics, returns 500 without crashing the process |
+
+---
+
+## Example curl Requests
+
+```bash
+# Create a memory
 curl -X POST http://localhost:8080/api/v1/memories \
   -H "Content-Type: application/json" \
   -d '{
-    "user_id":"demo-user",
-    "content":"User prefers pour-over coffee in the morning",
-    "category":"preference",
-    "source":"manual",
-    "importance":4
+    "user_id": "demo-user",
+    "content": "User prefers pour-over coffee in the morning",
+    "category": "preference",
+    "source": "manual",
+    "importance": 4
   }'
-```
 
-```bash
-curl "http://localhost:8080/api/v1/memories?user_id=demo-user&page=1&page_size=10"
-```
+# List memories (page 1, filtered by category)
+curl "http://localhost:8080/api/v1/memories?user_id=demo-user&category=preference&page=1&page_size=10"
 
-```bash
+# Search
 curl "http://localhost:8080/api/v1/memories/search?user_id=demo-user&query=coffee&limit=5"
-```
 
-```bash
+# Summary
 curl "http://localhost:8080/api/v1/memories/summary?user_id=demo-user"
 ```
+
+---
+
+## CI / CD
+
+GitHub Actions runs on every push and pull request to `main`:
+
+1. **Go** — `go test ./...` + `go build ./...`
+2. **Frontend** — `npm ci` + `npm run build`
+3. **Docker** — `docker compose config` validation
+
+See `.github/workflows/ci.yml` for the full pipeline definition.
