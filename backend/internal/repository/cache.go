@@ -11,6 +11,8 @@ type Cache interface {
 	Set(key string, value []byte, ttl time.Duration)
 	Delete(key string)
 	DeleteByPrefix(prefix string)
+	AcquireLock(key string, ttl time.Duration) bool
+	ReleaseLock(key string)
 }
 
 type cacheEntry struct {
@@ -73,4 +75,24 @@ func (c *InMemoryCache) DeleteByPrefix(prefix string) {
 			delete(c.entries, key)
 		}
 	}
+}
+
+func (c *InMemoryCache) AcquireLock(key string, ttl time.Duration) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	entry, ok := c.entries[key]
+	if ok && (entry.ExpiresAt.IsZero() || time.Now().Before(entry.ExpiresAt)) {
+		return false
+	}
+
+	c.entries[key] = cacheEntry{
+		Value:     []byte("1"),
+		ExpiresAt: time.Now().Add(ttl),
+	}
+	return true
+}
+
+func (c *InMemoryCache) ReleaseLock(key string) {
+	c.Delete(key)
 }

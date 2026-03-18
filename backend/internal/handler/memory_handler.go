@@ -150,6 +150,8 @@ func writeServiceError(c *gin.Context, err error) {
 		response.Error(c, http.StatusBadRequest, http.StatusBadRequest, err.Error())
 	case errors.Is(err, service.ErrDuplicateUpdate):
 		response.Error(c, http.StatusConflict, http.StatusConflict, err.Error())
+	case errors.Is(err, service.ErrCreateInProgress):
+		response.Error(c, http.StatusConflict, http.StatusConflict, err.Error())
 	case errors.Is(err, repository.ErrForbidden):
 		response.Error(c, http.StatusForbidden, http.StatusForbidden, err.Error())
 	case errors.Is(err, repository.ErrNotFound):

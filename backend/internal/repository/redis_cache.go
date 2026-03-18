@@ -53,3 +53,15 @@ func (c *RedisCache) DeleteByPrefix(prefix string) {
 		cursor = nextCursor
 	}
 }
+
+func (c *RedisCache) AcquireLock(key string, ttl time.Duration) bool {
+	locked, err := c.client.SetNX(context.Background(), key, "1", ttl).Result()
+	if err != nil {
+		return false
+	}
+	return locked
+}
+
+func (c *RedisCache) ReleaseLock(key string) {
+	_ = c.client.Del(context.Background(), key).Err()
+}
