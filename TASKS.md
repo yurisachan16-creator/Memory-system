@@ -29,7 +29,7 @@ Memory-system/
 
 ## 后端任务（Backend - Go）
 
-### B1: 项目脚手架与基础设施
+### ✅ B1: 项目脚手架与基础设施
 **负责内容：**
 - 初始化 Go module (`go mod init`)
 - 建立项目目录结构 (cmd/internal/migrations)
@@ -44,7 +44,7 @@ Memory-system/
 
 ---
 
-### B2: 数据库设计与迁移
+### ✅ B2: 数据库设计与迁移
 **负责内容：**
 - 设计 `memories` 表结构：
   ```sql
@@ -75,7 +75,7 @@ Memory-system/
 
 ---
 
-### B3: 记忆 CRUD 接口
+### ✅ B3: 记忆 CRUD 接口
 **负责内容：**
 - `POST /api/v1/memories` — 新增记忆
   - 参数校验 (content 非空, category/source 枚举, importance 1-5)
@@ -97,7 +97,7 @@ Memory-system/
 
 ---
 
-### B4: 记忆检索接口
+### ✅ B4: 记忆检索接口
 **负责内容：**
 - `GET /api/v1/memories/search?user_id=xxx&query=xxx`
 - 检索策略（多层打分）：
@@ -113,7 +113,7 @@ Memory-system/
 
 ---
 
-### B5: 记忆摘要接口
+### ✅ B5: 记忆摘要接口
 **负责内容：**
 - `GET /api/v1/memories/summary?user_id=xxx`
 - 服务端聚合逻辑：
@@ -130,7 +130,7 @@ Memory-system/
 
 ---
 
-### B6: Redis 缓存层设计
+### ✅ B6: Redis 缓存层设计
 **负责内容：**
 - 记忆列表缓存: `memories:list:{user_id}:{hash(query_params)}` TTL 5min
 - 搜索结果缓存: `memories:search:{user_id}:{query_hash}` TTL 5min
@@ -145,7 +145,7 @@ Memory-system/
 
 ---
 
-### B7: Docker 化
+### ✅ B7: Docker 化
 **负责内容：**
 - 后端 `Dockerfile` (多阶段构建)
 - `docker-compose.yml` 编排：Go 服务 + MySQL + Redis
@@ -158,7 +158,7 @@ Memory-system/
 
 ---
 
-### B8: 单元测试与接口测试
+### ✅ B8: 单元测试与接口测试
 **负责内容：**
 - Repository 层单元测试 (使用 sqlmock)
 - Service 层单元测试
@@ -171,7 +171,7 @@ Memory-system/
 
 ---
 
-### B9: README 文档
+### ✅ B9: README 文档
 **负责内容：**
 - 项目整体设计说明
 - 表结构设计与说明
@@ -189,7 +189,7 @@ Memory-system/
 
 ## 前端任务（Frontend）
 
-### F1: 前端项目初始化
+### ✅ F1: 前端项目初始化
 **负责内容：**
 - 使用 React + TypeScript + Vite 初始化项目
 - 安装依赖：Ant Design (UI 库)、axios (HTTP)、react-router
@@ -201,7 +201,7 @@ Memory-system/
 
 ---
 
-### F2: 记忆管理页面
+### ✅ F2: 记忆管理页面
 **负责内容：**
 - 记忆列表页：表格展示，支持分页、按 category 筛选、按 importance/时间排序
 - 新增记忆：表单弹窗 (content, category, source, importance)
@@ -215,7 +215,7 @@ Memory-system/
 
 ---
 
-### F3: 记忆检索页面
+### ✅ F3: 记忆检索页面
 **负责内容：**
 - 搜索框：输入 query 进行检索
 - 结果列表：展示 3-5 条最相关记忆，高亮匹配关键词
@@ -227,7 +227,7 @@ Memory-system/
 
 ---
 
-### F4: 记忆摘要页面
+### ✅ F4: 记忆摘要页面
 **负责内容：**
 - Dashboard 样式展示用户记忆摘要
 - 分区展示：用户偏好、当前目标、重要背景、最近记忆
