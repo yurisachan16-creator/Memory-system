@@ -1,0 +1,22 @@
+app:
+  name: memory-system-backend
+  env: development
+  host: 0.0.0.0
+  port: 8080
+  auto_migrate: true
+
+database:
+  driver: mysql
+  host: 127.0.0.1
+  port: 3306
+  user: root
+  password: memory_password
+  name: memory_system
+  params: charset=utf8mb4&parseTime=true&loc=Local&multiStatements=true
+
+redis:
+  host: 127.0.0.1
+  port: 6379
+  password: ""
+  db: 0
+
