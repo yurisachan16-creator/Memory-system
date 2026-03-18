@@ -16,8 +16,8 @@ import (
 )
 
 const (
-	searchCacheTTL  = 5 * time.Minute
-	summaryCacheTTL = 10 * time.Minute
+	dedupLockRetryDelay = 25 * time.Millisecond
+	dedupLockMaxAttempts = 20
 )
 
 var (
@@ -32,6 +32,7 @@ var (
 	ErrInvalidImportance = errors.New("importance must be between 1 and 5")
 	ErrInvalidQuery      = errors.New("query is required")
 	ErrDuplicateUpdate   = errors.New("another memory with the same content already exists")
+	ErrCreateInProgress  = errors.New("memory create is already in progress")
 )
 
 type MemoryService struct {
@@ -64,6 +65,11 @@ func (s *MemoryService) CreateMemory(ctx context.Context, req model.CreateMemory
 	now := s.now().UTC()
 	req.Content = model.NormalizeContent(req.Content)
 	contentHash := model.HashContent(req.Content)
+	lockKey := repository.BuildDedupLockKey(req.UserID, contentHash)
+	if err := s.acquireDedupLock(ctx, lockKey); err != nil {
+		return model.Memory{}, false, err
+	}
+	defer s.cache.ReleaseLock(lockKey)
 
 	existing, err := s.repo.GetByHash(ctx, req.UserID, contentHash)
 	if err == nil {
@@ -111,23 +117,36 @@ func (s *MemoryService) ListMemories(ctx context.Context, query model.ListMemori
 	if err := validateListQuery(query); err != nil {
 		return model.ListMemoriesResult{}, err
 	}
-	items, total, err := s.repo.List(ctx, repository.ListFilter{
+	filter := repository.ListFilter{
 		UserID:   query.UserID,
 		Category: query.Category,
 		SortBy:   query.SortBy,
 		Order:    query.Order,
 		Page:     query.Page,
 		PageSize: query.PageSize,
-	})
+	}
+	cacheKey := repository.BuildListCacheKey(filter)
+	if payload, ok := s.cache.Get(cacheKey); ok {
+		var cached model.ListMemoriesResult
+		if err := json.Unmarshal(payload, &cached); err == nil {
+			return cached, nil
+		}
+	}
+
+	items, total, err := s.repo.List(ctx, filter)
 	if err != nil {
 		return model.ListMemoriesResult{}, err
 	}
-	return model.ListMemoriesResult{
+	result := model.ListMemoriesResult{
 		Items:    items,
 		Total:    total,
 		Page:     query.Page,
 		PageSize: query.PageSize,
-	}, nil
+	}
+	if payload, err := json.Marshal(result); err == nil {
+		s.cache.Set(cacheKey, payload, repository.ListCacheTTL)
+	}
+	return result, nil
 }
 
 func (s *MemoryService) UpdateMemory(ctx context.Context, id int64, req model.UpdateMemoryRequest) (model.Memory, error) {
@@ -201,7 +220,7 @@ func (s *MemoryService) SearchMemories(ctx context.Context, userID, query string
 		limit = 5
 	}
 
-	cacheKey := fmt.Sprintf("memories:search:%s:%s", userID, model.HashContent(query))
+	cacheKey := repository.BuildSearchCacheKey(userID, query)
 	if payload, ok := s.cache.Get(cacheKey); ok {
 		var cached []model.SearchMemoryResult
 		if err := json.Unmarshal(payload, &cached); err == nil {
@@ -247,7 +266,7 @@ func (s *MemoryService) SearchMemories(ctx context.Context, userID, query string
 	}
 
 	if payload, err := json.Marshal(results); err == nil {
-		s.cache.Set(cacheKey, payload, searchCacheTTL)
+		s.cache.Set(cacheKey, payload, repository.SearchCacheTTL)
 	}
 	return results, false, nil
 }
@@ -256,7 +275,7 @@ func (s *MemoryService) GetSummary(ctx context.Context, userID string) (model.Su
 	if strings.TrimSpace(userID) == "" {
 		return model.SummaryResult{}, false, ErrInvalidUserID
 	}
-	cacheKey := fmt.Sprintf("memories:summary:%s", userID)
+	cacheKey := repository.BuildSummaryCacheKey(userID)
 	if payload, ok := s.cache.Get(cacheKey); ok {
 		var cached model.SummaryResult
 		if err := json.Unmarshal(payload, &cached); err == nil {
@@ -277,14 +296,32 @@ func (s *MemoryService) GetSummary(ctx context.Context, userID string) (model.Su
 		Recent:      summarizeRecent(memories, now),
 	}
 	if payload, err := json.Marshal(result); err == nil {
-		s.cache.Set(cacheKey, payload, summaryCacheTTL)
+		s.cache.Set(cacheKey, payload, repository.SummaryCacheTTL)
 	}
 	return result, false, nil
 }
 
 func (s *MemoryService) invalidateUserCaches(userID string) {
-	s.cache.DeleteByPrefix(fmt.Sprintf("memories:search:%s:", userID))
-	s.cache.Delete(fmt.Sprintf("memories:summary:%s", userID))
+	s.cache.DeleteByPrefix(repository.ListCachePrefix(userID))
+	s.cache.DeleteByPrefix(repository.SearchCachePrefix(userID))
+	s.cache.Delete(repository.BuildSummaryCacheKey(userID))
+}
+
+func (s *MemoryService) acquireDedupLock(ctx context.Context, key string) error {
+	for attempt := 0; attempt < dedupLockMaxAttempts; attempt++ {
+		if s.cache.AcquireLock(key, repository.DedupLockTTL) {
+			return nil
+		}
+
+		timer := time.NewTimer(dedupLockRetryDelay)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+	return ErrCreateInProgress
 }
 
 func validateCreateRequest(req model.CreateMemoryRequest) error {

@@ -76,10 +76,46 @@ func TestMemoryCRUDSearchAndSummaryFlow(t *testing.T) {
 	if searchResp.Code != http.StatusOK {
 		t.Fatalf("expected 200 on search, got %d", searchResp.Code)
 	}
+	var searchPayload struct {
+		Data struct {
+			Cached bool `json:"cached"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(searchResp.Body.Bytes(), &searchPayload); err != nil {
+		t.Fatalf("decode search payload: %v", err)
+	}
+	if searchPayload.Data.Cached {
+		t.Fatalf("expected first search response not cached")
+	}
+	searchCachedResp := performJSON(t, server, http.MethodGet, "/api/v1/memories/search?user_id=u1&query=espresso", nil)
+	if err := json.Unmarshal(searchCachedResp.Body.Bytes(), &searchPayload); err != nil {
+		t.Fatalf("decode cached search payload: %v", err)
+	}
+	if !searchPayload.Data.Cached {
+		t.Fatalf("expected second search response to be cached")
+	}
 
 	summaryResp := performJSON(t, server, http.MethodGet, "/api/v1/memories/summary?user_id=u1", nil)
 	if summaryResp.Code != http.StatusOK {
 		t.Fatalf("expected 200 on summary, got %d", summaryResp.Code)
+	}
+	var summaryPayload struct {
+		Data struct {
+			Cached bool `json:"cached"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(summaryResp.Body.Bytes(), &summaryPayload); err != nil {
+		t.Fatalf("decode summary payload: %v", err)
+	}
+	if summaryPayload.Data.Cached {
+		t.Fatalf("expected first summary response not cached")
+	}
+	summaryCachedResp := performJSON(t, server, http.MethodGet, "/api/v1/memories/summary?user_id=u1", nil)
+	if err := json.Unmarshal(summaryCachedResp.Body.Bytes(), &summaryPayload); err != nil {
+		t.Fatalf("decode cached summary payload: %v", err)
+	}
+	if !summaryPayload.Data.Cached {
+		t.Fatalf("expected second summary response to be cached")
 	}
 
 	deleteResp := performJSON(t, server, http.MethodDelete, "/api/v1/memories/"+strconv.FormatInt(listPayload.Data.Items[0].ID, 10)+"?user_id=u1", nil)

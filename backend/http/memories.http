@@ -1,0 +1,38 @@
+@baseUrl = http://localhost:8080/api/v1
+@userId = demo-user
+@memoryId = 1
+
+### Create memory
+POST {{baseUrl}}/memories
+Content-Type: application/json
+
+{
+  "user_id": "{{userId}}",
+  "content": "User prefers pour-over coffee in the morning",
+  "category": "preference",
+  "source": "manual",
+  "importance": 4
+}
+
+### List memories
+GET {{baseUrl}}/memories?user_id={{userId}}&page=1&page_size=10&sort_by=created_at&order=desc
+
+### Search memories
+GET {{baseUrl}}/memories/search?user_id={{userId}}&query=coffee&limit=5
+
+### Get summary
+GET {{baseUrl}}/memories/summary?user_id={{userId}}
+
+### Update memory
+PUT {{baseUrl}}/memories/{{memoryId}}
+Content-Type: application/json
+
+{
+  "user_id": "{{userId}}",
+  "content": "User prefers pour-over coffee and hand brew gear",
+  "category": "preference",
+  "importance": 5
+}
+
+### Delete memory
+DELETE {{baseUrl}}/memories/{{memoryId}}?user_id={{userId}}
