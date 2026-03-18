@@ -1,33 +1,23 @@
 import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from "@ant-design/icons";
 import { App, Button, Card, Empty, Popconfirm, Select, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { createMemory, deleteMemory, listMemories, updateMemory } from "../api/memories";
 import { MemoryFormModal, type MemoryFormValues } from "../components/MemoryFormModal";
 import { SectionHeader } from "../components/SectionHeader";
+import { useLanguage } from "../context/LanguageContext";
 import { useUser } from "../context/UserContext";
+import { categoryKeys } from "../i18n";
 import {
-  CATEGORY_OPTIONS,
-  categoryLabelMap,
-  formatDateTime,
   type Category,
   type CreateMemoryPayload,
   type ListMemoriesParams,
   type ListMemoriesResult,
   type Memory,
-  type UpdateMemoryPayload
+  type UpdateMemoryPayload,
+  formatDateTime
 } from "../types/memory";
-
-const sortOptions = [
-  { label: "Created time", value: "created_at" },
-  { label: "Importance", value: "importance" }
-];
-
-const orderOptions = [
-  { label: "Descending", value: "desc" },
-  { label: "Ascending", value: "asc" }
-];
 
 const emptyResult: ListMemoriesResult = {
   items: [],
@@ -39,6 +29,7 @@ const emptyResult: ListMemoriesResult = {
 export function MemoryPage() {
   const { message } = App.useApp();
   const { userId } = useUser();
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -54,6 +45,31 @@ export function MemoryPage() {
     pageSize: 10,
     showSizeChanger: true
   });
+
+  const categoryOptions = useMemo(
+    () =>
+      (["preference", "identity", "goal", "context"] as Category[]).map((v) => ({
+        label: t(categoryKeys[v]),
+        value: v
+      })),
+    [t]
+  );
+
+  const sortOptions = useMemo(
+    () => [
+      { label: t("memory.sortCreated"), value: "created_at" as const },
+      { label: t("memory.sortImportance"), value: "importance" as const }
+    ],
+    [t]
+  );
+
+  const orderOptions = useMemo(
+    () => [
+      { label: t("memory.orderDesc"), value: "desc" as const },
+      { label: t("memory.orderAsc"), value: "asc" as const }
+    ],
+    [t]
+  );
 
   useEffect(() => {
     if (!userId) {
@@ -80,7 +96,7 @@ export function MemoryPage() {
         }
       } catch (error) {
         if (!cancelled) {
-          void message.error(error instanceof Error ? error.message : "Failed to load memories");
+          void message.error(error instanceof Error ? error.message : t("memory.loadError"));
         }
       } finally {
         if (!cancelled) {
@@ -94,99 +110,104 @@ export function MemoryPage() {
     return () => {
       cancelled = true;
     };
-  }, [category, message, order, pagination.current, pagination.pageSize, refreshKey, sortBy, userId]);
+  }, [category, message, order, pagination.current, pagination.pageSize, refreshKey, sortBy, t, userId]);
 
-  const columns: ColumnsType<Memory> = [
-    {
-      title: "Content",
-      dataIndex: "content",
-      key: "content",
-      render: (value: string) => (
-        <Typography.Paragraph ellipsis={{ rows: 2, expandable: true, symbol: "more" }} className="table-content">
-          {value}
-        </Typography.Paragraph>
-      )
-    },
-    {
-      title: "Category",
-      dataIndex: "category",
-      key: "category",
-      width: 130,
-      render: (value: Memory["category"]) => <Tag color="blue">{categoryLabelMap[value]}</Tag>
-    },
-    {
-      title: "Source",
-      dataIndex: "source",
-      key: "source",
-      width: 120
-    },
-    {
-      title: "Importance",
-      dataIndex: "importance",
-      key: "importance",
-      width: 120,
-      render: (value: number) => <Tag color="gold">P{value}</Tag>
-    },
-    {
-      title: "Created",
-      dataIndex: "created_at",
-      key: "created_at",
-      width: 200,
-      render: formatDateTime
-    },
-    {
-      title: "Updated",
-      dataIndex: "updated_at",
-      key: "updated_at",
-      width: 200,
-      render: formatDateTime
-    },
-    {
-      title: "Actions",
-      key: "actions",
-      width: 140,
-      render: (_, record) => (
-        <Space>
-          <Button
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => {
-              setMode("edit");
-              setEditingMemory(record);
-              setModalOpen(true);
-            }}
-          >
-            Edit
-          </Button>
-          <Popconfirm
-            title="Delete this memory?"
-            description="This will perform a soft delete for the active user."
-            okText="Delete"
-            cancelText="Cancel"
-            onConfirm={async () => {
-              try {
-                await deleteMemory(record.id, userId);
-                void message.success("Memory deleted");
-                const nextTotal = Math.max(result.total - 1, 0);
-                const maxPage = Math.max(Math.ceil(nextTotal / (pagination.pageSize ?? 10)), 1);
-                setPagination((current) => ({
-                  ...current,
-                  current: Math.min(current.current ?? 1, maxPage)
-                }));
-                setRefreshKey((value) => value + 1);
-              } catch (error) {
-                void message.error(error instanceof Error ? error.message : "Failed to delete memory");
-              }
-            }}
-          >
-            <Button size="small" danger icon={<DeleteOutlined />}>
-              Delete
+  const columns: ColumnsType<Memory> = useMemo(
+    () => [
+      {
+        title: t("memory.colContent"),
+        dataIndex: "content",
+        key: "content",
+        render: (value: string) => (
+          <Typography.Paragraph ellipsis={{ rows: 2, expandable: true, symbol: "more" }} className="table-content">
+            {value}
+          </Typography.Paragraph>
+        )
+      },
+      {
+        title: t("memory.colCategory"),
+        dataIndex: "category",
+        key: "category",
+        width: 130,
+        render: (value: Memory["category"]) => (
+          <Tag color="blue">{t(categoryKeys[value])}</Tag>
+        )
+      },
+      {
+        title: t("memory.colSource"),
+        dataIndex: "source",
+        key: "source",
+        width: 120
+      },
+      {
+        title: t("memory.colImportance"),
+        dataIndex: "importance",
+        key: "importance",
+        width: 120,
+        render: (value: number) => <Tag color="gold">P{value}</Tag>
+      },
+      {
+        title: t("memory.colCreated"),
+        dataIndex: "created_at",
+        key: "created_at",
+        width: 200,
+        render: formatDateTime
+      },
+      {
+        title: t("memory.colUpdated"),
+        dataIndex: "updated_at",
+        key: "updated_at",
+        width: 200,
+        render: formatDateTime
+      },
+      {
+        title: t("memory.colActions"),
+        key: "actions",
+        width: 140,
+        render: (_, record) => (
+          <Space>
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => {
+                setMode("edit");
+                setEditingMemory(record);
+                setModalOpen(true);
+              }}
+            >
+              {t("memory.edit")}
             </Button>
-          </Popconfirm>
-        </Space>
-      )
-    }
-  ];
+            <Popconfirm
+              title={t("memory.deleteTitle")}
+              description={t("memory.deleteDesc")}
+              okText={t("memory.deleteOk")}
+              cancelText={t("memory.deleteCancel")}
+              onConfirm={async () => {
+                try {
+                  await deleteMemory(record.id, userId);
+                  void message.success(t("memory.deleteSuccess"));
+                  const nextTotal = Math.max(result.total - 1, 0);
+                  const maxPage = Math.max(Math.ceil(nextTotal / (pagination.pageSize ?? 10)), 1);
+                  setPagination((current) => ({
+                    ...current,
+                    current: Math.min(current.current ?? 1, maxPage)
+                  }));
+                  setRefreshKey((value) => value + 1);
+                } catch (error) {
+                  void message.error(error instanceof Error ? error.message : t("memory.deleteError"));
+                }
+              }}
+            >
+              <Button size="small" danger icon={<DeleteOutlined />}>
+                {t("memory.delete")}
+              </Button>
+            </Popconfirm>
+          </Space>
+        )
+      }
+    ],
+    [message, pagination.pageSize, result.total, t, userId]
+  );
 
   const refreshCurrentPage = () => {
     setRefreshKey((value) => value + 1);
@@ -200,7 +221,7 @@ export function MemoryPage() {
 
   async function handleSubmit(values: MemoryFormValues) {
     if (!userId) {
-      void message.warning("Set a user_id before saving memories");
+      void message.warning(t("memory.noUserWarning"));
       return;
     }
 
@@ -215,7 +236,7 @@ export function MemoryPage() {
           importance: values.importance
         };
         await createMemory(payload);
-        void message.success("Memory created");
+        void message.success(t("memory.createSuccess"));
         if ((pagination.current ?? 1) === 1) {
           refreshCurrentPage();
         } else {
@@ -229,12 +250,12 @@ export function MemoryPage() {
           importance: values.importance
         };
         await updateMemory(editingMemory.id, payload);
-        void message.success("Memory updated");
+        void message.success(t("memory.updateSuccess"));
         refreshCurrentPage();
       }
       setModalOpen(false);
     } catch (error) {
-      void message.error(error instanceof Error ? error.message : "Failed to save memory");
+      void message.error(error instanceof Error ? error.message : t("memory.saveError"));
     } finally {
       setSubmitting(false);
     }
@@ -244,15 +265,15 @@ export function MemoryPage() {
     <div className="page-stack">
       <Card className="hero-card">
         <SectionHeader
-          title="Memory Management"
-          subtitle="Browse and curate long-term memories with filters, pagination, and controlled edits."
+          title={t("memory.pageTitle")}
+          subtitle={t("memory.pageSubtitle")}
           extra={
             <Space wrap>
               <Button icon={<ReloadOutlined />} onClick={refreshCurrentPage}>
-                Refresh
+                {t("memory.refresh")}
               </Button>
               <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal} disabled={!userId}>
-                Add memory
+                {t("memory.add")}
               </Button>
             </Space>
           }
@@ -261,8 +282,8 @@ export function MemoryPage() {
         <Space wrap className="filter-bar">
           <Select
             allowClear
-            placeholder="Filter category"
-            options={CATEGORY_OPTIONS}
+            placeholder={t("memory.filterCategory")}
+            options={categoryOptions}
             value={category}
             onChange={(value) => {
               setCategory(value);
@@ -293,7 +314,7 @@ export function MemoryPage() {
 
       <Card className="surface-card">
         {!userId ? (
-          <Empty description="Set a user_id in the top bar to load memories." />
+          <Empty description={t("memory.emptyHint")} />
         ) : (
           <Table
             rowKey="id"
@@ -305,7 +326,7 @@ export function MemoryPage() {
               current: result.page,
               pageSize: result.page_size,
               total: result.total,
-              showTotal: (total) => `${total} memories`
+              showTotal: (total) => t("memory.total", { count: total })
             }}
             onChange={(nextPagination) => setPagination(nextPagination)}
           />

@@ -1,22 +1,24 @@
-import { DashboardOutlined, SearchOutlined, UnorderedListOutlined } from "@ant-design/icons";
+import { DashboardOutlined, SearchOutlined, TranslationOutlined, UnorderedListOutlined } from "@ant-design/icons";
 import { Alert, Button, Input, Layout, Menu, Space, Tag, Typography } from "antd";
 import type { MenuProps } from "antd";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
+import { useLanguage } from "../context/LanguageContext";
 import { useUser } from "../context/UserContext";
 
 const { Header, Content } = Layout;
-
-const navItems: MenuProps["items"] = [
-  { key: "/memories", icon: <UnorderedListOutlined />, label: "Memories" },
-  { key: "/search", icon: <SearchOutlined />, label: "Search" },
-  { key: "/summary", icon: <DashboardOutlined />, label: "Summary" }
-];
 
 export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { userId, draftUserId, setDraftUserId, confirmUserId } = useUser();
+  const { t, toggleLang } = useLanguage();
+
+  const navItems: MenuProps["items"] = [
+    { key: "/memories", icon: <UnorderedListOutlined />, label: t("nav.memories") },
+    { key: "/search", icon: <SearchOutlined />, label: t("nav.search") },
+    { key: "/summary", icon: <DashboardOutlined />, label: t("nav.summary") }
+  ];
 
   return (
     <Layout className="app-layout">
@@ -25,10 +27,10 @@ export function AppShell() {
       <Header className="app-header">
         <div className="brand-block">
           <Typography.Title level={2} className="brand-title">
-            Memory System Console
+            {t("app.title")}
           </Typography.Title>
           <Typography.Paragraph className="brand-subtitle">
-            A focused workspace for curating, searching, and summarizing user memory.
+            {t("app.subtitle")}
           </Typography.Paragraph>
         </div>
 
@@ -44,17 +46,28 @@ export function AppShell() {
           <Space.Compact className="user-switcher">
             <Input
               aria-label="Current user id"
-              placeholder="Enter active user_id"
+              placeholder={t("header.userIdPlaceholder")}
               value={draftUserId}
               onChange={(event) => setDraftUserId(event.target.value)}
               onPressEnter={confirmUserId}
             />
             <Button type="primary" onClick={confirmUserId}>
-              Apply
+              {t("header.apply")}
             </Button>
           </Space.Compact>
 
-          {userId ? <Tag color="processing">Active user: {userId}</Tag> : <Tag color="warning">User not set</Tag>}
+          {userId
+            ? <Tag color="processing">{t("header.activeUser", { id: userId })}</Tag>
+            : <Tag color="warning">{t("header.userNotSet")}</Tag>
+          }
+
+          <Button
+            icon={<TranslationOutlined />}
+            onClick={toggleLang}
+            title="Switch language / 切换语言"
+          >
+            {t("header.langToggle")}
+          </Button>
         </div>
       </Header>
 
@@ -64,7 +77,7 @@ export function AppShell() {
             className="global-alert"
             type="warning"
             showIcon
-            message="Set a user_id from the top bar before interacting with memories."
+            message={t("header.noUser")}
           />
         )}
         <Outlet />

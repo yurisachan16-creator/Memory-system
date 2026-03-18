@@ -1,7 +1,9 @@
 import { Form, Input, InputNumber, Modal, Select } from "antd";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
-import { CATEGORY_OPTIONS, SOURCE_OPTIONS } from "../types/memory";
+import { useLanguage } from "../context/LanguageContext";
+import { sourceKeys, categoryKeys } from "../i18n";
+import type { Category, Source } from "../types/memory";
 
 export interface MemoryFormValues {
   content: string;
@@ -35,7 +37,26 @@ export function MemoryFormModal({
   onSubmit
 }: MemoryFormModalProps) {
   const [form] = Form.useForm<MemoryFormValues>();
+  const { t } = useLanguage();
   const createMode = mode === "create";
+
+  const categoryOptions = useMemo(
+    () =>
+      (["preference", "identity", "goal", "context"] as Category[]).map((v) => ({
+        label: t(categoryKeys[v]),
+        value: v
+      })),
+    [t]
+  );
+
+  const sourceOptions = useMemo(
+    () =>
+      (["chat", "manual", "system"] as Source[]).map((v) => ({
+        label: t(sourceKeys[v]),
+        value: v
+      })),
+    [t]
+  );
 
   useEffect(() => {
     if (!open) {
@@ -54,8 +75,8 @@ export function MemoryFormModal({
       open={open}
       destroyOnClose
       confirmLoading={confirmLoading}
-      title={createMode ? "Add memory" : "Edit memory"}
-      okText={createMode ? "Create" : "Save"}
+      title={createMode ? t("memoryForm.titleCreate") : t("memoryForm.titleEdit")}
+      okText={createMode ? t("memoryForm.okCreate") : t("memoryForm.okSave")}
       onCancel={onCancel}
       onOk={async () => {
         const values = await form.validateFields();
@@ -64,30 +85,38 @@ export function MemoryFormModal({
     >
       <Form form={form} layout="vertical">
         <Form.Item
-          label="Content"
+          label={t("memoryForm.labelContent")}
           name="content"
           rules={[
-            { required: true, message: "Please enter memory content." },
-            { min: 2, message: "Content should be at least 2 characters." }
+            { required: true, message: t("memoryForm.ruleContent") },
+            { min: 2, message: t("memoryForm.ruleContentMin") }
           ]}
         >
           <Input.TextArea rows={5} maxLength={500} showCount />
         </Form.Item>
 
-        <Form.Item label="Category" name="category" rules={[{ required: true, message: "Select a category." }]}>
-          <Select options={CATEGORY_OPTIONS} />
+        <Form.Item
+          label={t("memoryForm.labelCategory")}
+          name="category"
+          rules={[{ required: true, message: t("memoryForm.ruleCategory") }]}
+        >
+          <Select options={categoryOptions} />
         </Form.Item>
 
         {createMode && (
-          <Form.Item label="Source" name="source" rules={[{ required: true, message: "Select a source." }]}>
-            <Select options={SOURCE_OPTIONS} />
+          <Form.Item
+            label={t("memoryForm.labelSource")}
+            name="source"
+            rules={[{ required: true, message: t("memoryForm.ruleSource") }]}
+          >
+            <Select options={sourceOptions} />
           </Form.Item>
         )}
 
         <Form.Item
-          label="Importance"
+          label={t("memoryForm.labelImportance")}
           name="importance"
-          rules={[{ required: true, message: "Set importance between 1 and 5." }]}
+          rules={[{ required: true, message: t("memoryForm.ruleImportance") }]}
         >
           <InputNumber min={1} max={5} precision={0} className="full-width" />
         </Form.Item>

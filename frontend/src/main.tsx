@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { App as AntdApp, ConfigProvider } from "antd";
 
 import App from "./App";
+import { LanguageProvider } from "./context/LanguageContext";
 import { UserProvider } from "./context/UserContext";
 import "./styles.css";
 
@@ -24,9 +25,11 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     >
       <AntdApp>
         <BrowserRouter>
-          <UserProvider>
-            <App />
-          </UserProvider>
+          <LanguageProvider>
+            <UserProvider>
+              <App />
+            </UserProvider>
+          </LanguageProvider>
         </BrowserRouter>
       </AntdApp>
     </ConfigProvider>
