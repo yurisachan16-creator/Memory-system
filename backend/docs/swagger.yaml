@@ -1,0 +1,497 @@
+basePath: /api/v1
+definitions:
+  handler.createMemoryResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/model.Memory'
+      message:
+        type: string
+    type: object
+  handler.deleteMemoryData:
+    properties:
+      id:
+        type: integer
+    type: object
+  handler.deleteMemoryResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/handler.deleteMemoryData'
+      message:
+        type: string
+    type: object
+  handler.errorResponse:
+    properties:
+      code:
+        type: integer
+      message:
+        type: string
+    type: object
+  handler.healthResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/handler.healthResponseData'
+      message:
+        type: string
+    type: object
+  handler.healthResponseData:
+    properties:
+      database:
+        type: string
+      redis:
+        type: string
+      service:
+        type: string
+    type: object
+  handler.listMemoriesResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/model.ListMemoriesResult'
+      message:
+        type: string
+    type: object
+  handler.searchMemoriesData:
+    properties:
+      cached:
+        type: boolean
+      count:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/model.SearchMemoryResult'
+        type: array
+    type: object
+  handler.searchMemoriesResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/handler.searchMemoriesData'
+      message:
+        type: string
+    type: object
+  handler.summaryDataWrap:
+    properties:
+      cached:
+        type: boolean
+      summary:
+        $ref: '#/definitions/model.SummaryResult'
+    type: object
+  handler.summaryResponse:
+    properties:
+      code:
+        type: integer
+      data:
+        $ref: '#/definitions/handler.summaryDataWrap'
+      message:
+        type: string
+    type: object
+  model.Category:
+    enum:
+    - preference
+    - identity
+    - goal
+    - context
+    type: string
+    x-enum-varnames:
+    - CategoryPreference
+    - CategoryIdentity
+    - CategoryGoal
+    - CategoryContext
+  model.CreateMemoryRequest:
+    properties:
+      category:
+        $ref: '#/definitions/model.Category'
+      content:
+        type: string
+      importance:
+        type: integer
+      source:
+        $ref: '#/definitions/model.Source'
+      user_id:
+        type: string
+    type: object
+  model.ListMemoriesResult:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/model.Memory'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  model.Memory:
+    properties:
+      category:
+        $ref: '#/definitions/model.Category'
+      content:
+        type: string
+      content_hash:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      importance:
+        type: integer
+      is_deleted:
+        type: boolean
+      source:
+        $ref: '#/definitions/model.Source'
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  model.SearchMemoryResult:
+    properties:
+      final_score:
+        type: number
+      matched_terms:
+        items:
+          type: string
+        type: array
+      memory:
+        $ref: '#/definitions/model.Memory'
+      recency_score:
+        type: number
+      relevance_score:
+        type: number
+    type: object
+  model.Source:
+    enum:
+    - chat
+    - manual
+    - system
+    type: string
+    x-enum-varnames:
+    - SourceChat
+    - SourceManual
+    - SourceSystem
+  model.SummaryResult:
+    properties:
+      background:
+        items:
+          $ref: '#/definitions/model.Memory'
+        type: array
+      goals:
+        items:
+          $ref: '#/definitions/model.Memory'
+        type: array
+      preferences:
+        items:
+          $ref: '#/definitions/model.Memory'
+        type: array
+      recent:
+        items:
+          $ref: '#/definitions/model.Memory'
+        type: array
+    type: object
+  model.UpdateMemoryRequest:
+    properties:
+      category:
+        $ref: '#/definitions/model.Category'
+      content:
+        type: string
+      importance:
+        type: integer
+      user_id:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: Backend API for a simplified AI memory system.
+  title: Memory System API
+  version: "1.0"
+paths:
+  /healthz:
+    get:
+      description: Check service, database and Redis connectivity.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.healthResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+      summary: Check backend health
+      tags:
+      - health
+  /memories:
+    get:
+      consumes:
+      - application/json
+      description: List memories for a user with optional category filter, sorting
+        and pagination.
+      parameters:
+      - description: User ID
+        in: query
+        name: user_id
+        required: true
+        type: string
+      - description: Category
+        enum:
+        - preference
+        - identity
+        - goal
+        - context
+        in: query
+        name: category
+        type: string
+      - default: created_at
+        description: Sort field
+        enum:
+        - importance
+        - created_at
+        in: query
+        name: sort_by
+        type: string
+      - default: desc
+        description: Sort order
+        enum:
+        - asc
+        - desc
+        in: query
+        name: order
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.listMemoriesResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+      summary: List memories
+      tags:
+      - memories
+    post:
+      consumes:
+      - application/json
+      description: Create a memory record. Duplicate content for the same user merges
+        into the existing memory and keeps the higher importance.
+      parameters:
+      - description: Create memory payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.CreateMemoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Merged duplicate memory
+          schema:
+            $ref: '#/definitions/handler.createMemoryResponse'
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handler.createMemoryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+      summary: Create a memory
+      tags:
+      - memories
+  /memories/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Soft delete a memory that belongs to the specified user.
+      parameters:
+      - description: Memory ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: User ID
+        in: query
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.deleteMemoryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+      summary: Delete a memory
+      tags:
+      - memories
+    put:
+      consumes:
+      - application/json
+      description: Update content, category and importance for a memory that belongs
+        to the specified user.
+      parameters:
+      - description: Memory ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Update memory payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.UpdateMemoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.createMemoryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+      summary: Update a memory
+      tags:
+      - memories
+  /memories/search:
+    get:
+      consumes:
+      - application/json
+      description: Search memories for a user and return the top ranked results with
+        cache status.
+      parameters:
+      - description: User ID
+        in: query
+        name: user_id
+        required: true
+        type: string
+      - description: Search query
+        in: query
+        name: query
+        required: true
+        type: string
+      - default: 5
+        description: Result limit (3-5)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.searchMemoriesResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+      summary: Search memories
+      tags:
+      - memories
+  /memories/summary:
+    get:
+      consumes:
+      - application/json
+      description: Build a memory summary for a user including preferences, goals,
+        background and recent memories.
+      parameters:
+      - description: User ID
+        in: query
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.summaryResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.errorResponse'
+      summary: Summarize memories
+      tags:
+      - memories
+swagger: "2.0"
