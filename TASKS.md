@@ -253,7 +253,7 @@ Memory-system/
 阶段 5：B9（README 文档）
 ```
 
-## 任务分配建议
+## 任务分配建议（第一阶段）
 
 | Agent | 任务 | 说明 |
 |-------|------|------|
@@ -261,3 +261,81 @@ Memory-system/
 | Agent 2 (后端核心) | B3 → B4 → B5 | 三个核心 API 模块 |
 | Agent 3 (后端进阶) | B6 → B8 → B9 | Redis 缓存 + 测试 + 文档 |
 | Agent 4 (前端) | F1 → F2 → F3 → F4 | 全部前端工作 |
+
+---
+
+## 第二阶段任务（Phase 2）
+
+> 基于第一阶段完成的代码，补齐生产级缺失项。
+
+### ✅ C1: GitHub Actions CI 流水线
+**负责 Agent：** Agent 1
+**分支：** `agent1-ci-pipeline`
+**负责内容：**
+- 新建 `.github/workflows/ci.yml`，在 push/PR 到 main 时触发：
+  - Go 后端：`go test ./...` + `go build ./...`
+  - 前端：`npm ci && npm run build`
+  - Docker：`docker compose config` 校验
+- 后端 Gin 服务添加 **CORS 中间件**（`github.com/gin-contrib/cors`），允许前端跨域请求
+- 在 `backend/internal/middleware/cors.go` 中实现，注册到 `server.go`
+
+**交付物：** `.github/workflows/ci.yml`，CORS 中间件，`go test ./...` 在 CI 中通过
+
+**依赖：** 无（独立）
+
+---
+
+### C2: Swagger/OpenAPI 文档
+**负责 Agent：** Agent 2
+**分支：** `agent2-swagger-docs`
+**负责内容：**
+- 安装 `github.com/swaggo/swag` + `github.com/swaggo/gin-swagger`
+- 为所有 6 个接口的 handler 函数添加 swag 注释（`@Summary` `@Param` `@Success` `@Router`）
+- 运行 `swag init -g cmd/server/main.go -o docs/` 生成文档
+- 在 routes.go 注册 `GET /swagger/*any` 端点
+- 更新 README 添加 Swagger 访问地址
+
+**交付物：** `docs/` 目录，`/swagger/index.html` 可访问
+
+**依赖：** C1（需要 CORS 已配置）
+
+---
+
+### C3: 中间件增强（Rate Limit + Request ID）
+**负责 Agent：** Agent 3
+**分支：** `agent3-middleware-enhance`
+**负责内容：**
+- **Request ID 中间件**：每个请求生成 UUID，写入 `X-Request-Id` 响应头，注入 Gin Context
+- **Rate Limiting 中间件**：使用 `golang.org/x/time/rate`，按 IP 限速 30 req/s（超限返回 429）
+- **user_id 长度校验**：所有接口验证 `user_id` 不超过 64 字符
+- 将中间件注册到 `server.go`
+
+**交付物：** 3 个中间件文件，`go test ./...` 通过
+
+**依赖：** 无（独立）
+
+---
+
+### C4: 前端构建修复 + TypeScript 错误清零
+**负责 Agent：** Agent 4
+**分支：** `agent4-frontend-fix`
+**负责内容：**
+- 修复 `npm run build`（当前 `tsc --noEmit` 失败，36 个 TypeScript 问题）
+- 排查并修复所有类型错误（通常是 Ant Design 组件 prop 类型不匹配）
+- 确保 `frontend/src/types/memory.ts` 在所有页面正确导入，消除重复类型定义
+- 验证 `vite build` 成功，`dist/` 目录生成
+
+**交付物：** `npm run build` 零错误通过，`dist/` 目录可部署
+
+**依赖：** 无（独立）
+
+---
+
+## 第二阶段任务分配
+
+| Agent | 任务 | 说明 |
+|-------|------|------|
+| Agent 1 | C1: CI/CD + CORS | GitHub Actions 流水线 + 跨域支持 |
+| Agent 2 | C2: Swagger 文档 | API 自动化文档生成 |
+| Agent 3 | C3: 中间件增强 | Rate Limit + Request ID |
+| Agent 4 | C4: 前端构建修复 | 修复 TypeScript 错误 + 确保构建通过 |
