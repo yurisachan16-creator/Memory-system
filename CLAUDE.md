@@ -16,14 +16,16 @@ This is a Go backend implementation of a simplified AI Memory System, based on t
 
 ## API Endpoints
 
+所有接口统一使用 `/api/v1` 前缀。
+
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | /memories | Create a memory |
-| GET | /memories | List memories (filter by user_id, category; sort by importance/time; paginated) |
-| PUT | /memories/:id | Update a memory (owner only) |
-| DELETE | /memories/:id | Delete a memory (owner only) |
-| GET | /memories/search | Search memories (user_id + query → top 3-5 relevant results) |
-| GET | /memories/summary | Summarize memories by category + importance + recency |
+| POST | /api/v1/memories | Create a memory |
+| GET | /api/v1/memories | List memories (filter by user_id, category; sort by importance/time; paginated) |
+| PUT | /api/v1/memories/:id | Update a memory (owner only) |
+| DELETE | /api/v1/memories/:id | Delete a memory (owner only) |
+| GET | /api/v1/memories/search | Search memories (user_id + query → top 3-5 relevant results) |
+| GET | /api/v1/memories/summary | Summarize memories by category + importance + recency |
 
 ## Data Model
 
@@ -32,6 +34,12 @@ Memory fields: `id`, `user_id`, `content`, `category`, `source`, `importance`, `
 - `category`: `preference` | `identity` | `goal` | `context`
 - `source`: `chat` | `manual` | `system`
 - `importance`: integer 1–5
+
+## Frontend Convention
+
+- **user_id 交互方式**：全局顶栏切换。使用 React Context 维护当前 user_id，所有页面共享，不需要每个页面单独输入。顶栏提供输入框 + 最近用户下拉快捷切换。
+- **前端技术栈**：React + TypeScript + Vite + Ant Design
+- **API 代理**：开发模式下 Vite proxy 转发 `/api` 到后端 `localhost:8080`
 
 ## Key Design Decisions to Document
 
