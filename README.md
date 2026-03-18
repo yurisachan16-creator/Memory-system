@@ -117,7 +117,7 @@ final_score = relevance_score * 0.5 + importance_score * 0.3 + recency_score * 0
 ### 1. 使用 Docker Compose
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 默认端口：

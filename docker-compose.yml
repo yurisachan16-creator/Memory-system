@@ -1,7 +1,6 @@
 services:
   mysql:
     image: mysql:8.4
-    container_name: memory-system-mysql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: memory_password
@@ -18,7 +17,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: memory-system-redis
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -30,7 +28,6 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: memory-system-backend
     restart: unless-stopped
     depends_on:
       mysql:
@@ -59,7 +56,6 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
-    container_name: memory-system-frontend
     restart: unless-stopped
     depends_on:
       - backend
